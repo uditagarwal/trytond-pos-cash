@@ -142,17 +142,20 @@ class Escpos(object):
 
         self._print_image(pix_line, img_size)
 
-
     def barcode(self, code, bc, width, height, pos, font):
         """ Print Barcode """
+        close_bc = False
+
         # Align Bar Code()
         self._raw(TXT_ALIGN_CT)
+        self._raw(MODE_STANDARD)
         # Height
         if height >=2 or height <=6:
             self._raw(BARCODE_HEIGHT)
         else:
             raise BarcodeSizeError()
         # Width
+
         if width >= 1 or width <=255:
             self._raw(BARCODE_WIDTH)
         else:
@@ -182,15 +185,22 @@ class Escpos(object):
             self._raw(BARCODE_EAN8)
         elif bc.upper() == "CODE39":
             self._raw(BARCODE_CODE39)
+            close_bc = True
         elif bc.upper() == "ITF":
             self._raw(BARCODE_ITF)
         elif bc.upper() == "NW7":
             self._raw(BARCODE_NW7)
+        elif bc.upper() == "CODE128B":
+            self._raw(BARCODE_CODE128)
+            self._raw(('%02X' % (len(code) + len(BARCODE_CODE128B)) ).decode('hex'))
+            self._raw(BARCODE_CODE128B)
         else:
             raise BarcodeTypeError()
         # Print Code
         if code:
             self._raw(code)
+            if close_bc:
+                self._raw('\x00')
         else:
             raise exception.BarcodeCodeError()
 

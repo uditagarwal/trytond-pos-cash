@@ -16,6 +16,8 @@ this repository contains the full copyright notices and license terms. -->
                     <field name="company"/>
                     <label name="logo"/>
                     <field name="logo"/>
+                    <label name="sequence"/>
+                    <field name="sequence"/>
                     <button name="test_printer" string="Test printer" type="object"/>
                 </form>
                 ]]>
@@ -44,6 +46,11 @@ this repository contains the full copyright notices and license terms. -->
             <field name="wiz_name">pos_cash.sale.add_product</field>
         </record>
 
+        <record model="ir.action.wizard" id="wizard_cash_sale">
+            <field name="name">Cash</field>
+            <field name="wiz_name">pos_cash.sale.cash</field>
+        </record>
+
         <record model="ir.ui.view" id="pos_sale_view_form">
             <field name="model">pos_cash.sale</field>
             <field name="type">form</field>
@@ -55,12 +62,33 @@ this repository contains the full copyright notices and license terms. -->
                         <tree string="Positions">
                             <field name="product"/>
                             <field name="quantity"/>
+                            <field name="unit_price"/>
+                            <field name="total"/>
                         </tree>
                     </field>
-                    <group name="buttons" colspan="2">
-                        <button name="%(wizard_add_product)d" string="_Add Product"
-                            type="action"
-                            icon="tryton-go-next"/>
+                    <group name="summary" colspan="2" col="2">
+                        <group name="add_buttons" colspan="2">
+                            <button name="%(wizard_add_product)d" string="_Add Product"
+                                type="action"
+                                icon="tryton-go-next"/>
+                        </group>
+                        <label name="receipt_code"/>
+                        <field name="receipt_code"/>
+                        <label name="total_without_tax"/>
+                        <field name="total_without_tax"/>
+                        <label name="total_tax"/>
+                        <field name="total_tax"/>
+                        <label name="total_amount"/>
+                        <field name="total_amount"/>
+                        <group name="cash" colspan="2">
+                            <button name="%(wizard_cash_sale)d" string="_Cash Sale"
+                                    type="action"
+                                    icon="tryton-go-next"/>
+                        </group>
+                        <label name="total_paid"/>
+                        <field name="total_paid"/>
+                        <label name="drawback"/>
+                        <field name="drawback"/>
                     </group>
                     <field name="taxes" colspan="2"/>
                 </form>
