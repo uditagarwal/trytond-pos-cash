@@ -79,7 +79,9 @@ class WizardCashSale(Wizard):
     _name = 'pos_cash.sale.cash'
 
     states = {
+
         'init': {
+            'actions': ['_action_cash'],
             'result': {
                 'type': 'form',
                 'object': 'pos_cash.sale.cash_amount_enter',
@@ -92,13 +94,20 @@ class WizardCashSale(Wizard):
         'open': {
             'result': {
                 'type': 'action',
-                'action': '_action_cash',
+                'action': '_action_cash_received',
                 'state': 'end',
             },
         },
     }
 
     def _action_cash(self, data):
+        display = Pool().get('pos_cash.display', 'report')
+        sale_obj = Pool().get('pos_cash.sale')
+        sale = sale_obj.browse(data['id'])
+        display.show_total(sale)
+        return {}
+
+    def _action_cash_received(self, data):
         active_id = Transaction().context.get('active_id', False)
         if (not active_id):
             self.raise_user_error('No active ID found!')

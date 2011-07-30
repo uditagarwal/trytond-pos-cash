@@ -3,6 +3,8 @@
 from __future__ import with_statement
 from decimal import Decimal
 from receipt import Receipt
+import serial
+from escpos import escpos
 
 from trytond.model import ModelSQL, ModelView, ModelStorage, ModelSingleton, fields
 from trytond.wizard import Wizard
@@ -16,6 +18,9 @@ class PosCashConfiguration(ModelSingleton, ModelSQL, ModelView):
             'number Sequence', required=True)
     printer_port = fields.Char(string='Printer port', help='Port type the '
             'receipt printer is conntected to.')
+    display_port = fields.Char('Display port', help='Like /dev/ttyS0')
+    display_baud = fields.Numeric('BAUD-Rate', digits=(10,0))
+    display_digits = fields.Numeric('Digits per row', digits=(10,0))
     company = fields.Many2One('company.company', 'Company')
     logo = fields.Binary('Receipt Logo')
 
@@ -23,14 +28,31 @@ class PosCashConfiguration(ModelSingleton, ModelSQL, ModelView):
         super(PosCashConfiguration, self).__init__()
         self._rpc.update({
             'test_printer': True,
+            'test_display': True,
         })
-
 
     def default_printer_port(self):
         return '/dev/lp0'
 
+    def default_display_port(self):
+        return '/dev/ttyS0'
+
+    def default_display_baud(self):
+        return 9600
+
     def test_printer(self, ids):
+        receipt = Pool().get('pos_cash.receipt', 'report')
         receipt.test_printer()
+
+    def test_display(self, ids):
+        config = self.browse(1)
+        port = serial.Serial(config.display_port, config.display_baud)
+        display = escpos.Display(port)
+        display.set_cursor(False)
+        display.clear()
+        display.text('Display works!!!\nWell...')
+        del display
+        port.close()
 
 PosCashConfiguration()
 
@@ -50,6 +72,10 @@ class PosCashSale(ModelSQL, ModelView):
             'get_without_tax')
     total_paid = fields.Numeric('Total paid', readonly=True)
     drawback = fields.Function(fields.Numeric('Drawback'), 'get_drawback')
+
+    def __init__(self):
+        super(PosCashSale, self).__init__()
+        self._display = False
 
     def default_receipt_code(self):
         config_obj = Pool().get('pos_cash.configuration')
@@ -97,17 +123,23 @@ class PosCashSale(ModelSQL, ModelView):
 
     def add_product(self, sale, product, unit_price, qty):
         sale_line_obj = Pool().get('pos_cash.sale.line')
-        sale_line_obj.create({'sale': sale.id,
+        line_id = sale_line_obj.create({'sale': sale.id,
                     'product': product.id,
                     'unit_price': unit_price,
                     'quantity': qty,
                 })
+        if not self._display:
+           self._display = Pool().get('pos_cash.display', 'report')
+        line = sale_line_obj.browse(line_id)
+        self._display.show_sale_line(line)
 
     def cash(self, sale, cash_amount):
         self.write(sale.id, {'total_paid': cash_amount})
         pool = Pool()
         config = pool.get('pos_cash.configuration').browse(1)
         receipt = pool.get('pos_cash.receipt', 'report')
+        display = Pool().get('pos_cash.display', 'report')
+        display.show_paid(sale)
         receipt.print_sale(sale)
 
     def get_drawback(self, ids, name):

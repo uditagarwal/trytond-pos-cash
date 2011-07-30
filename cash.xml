@@ -9,7 +9,7 @@ this repository contains the full copyright notices and license terms. -->
             <field name="priority">10</field>
             <field name="arch" type="xml">
                 <![CDATA[
-                <form string="POS-Cash configuration">
+                <form string="POS-Cash configuration" col="4">
                     <label name="printer_port"/>
                     <field name="printer_port"/>
                     <label name="company"/>
@@ -18,7 +18,16 @@ this repository contains the full copyright notices and license terms. -->
                     <field name="logo"/>
                     <label name="sequence"/>
                     <field name="sequence"/>
-                    <button name="test_printer" string="Test printer" type="object"/>
+                    <label name="display_port"/>
+                    <field name="display_port"/>
+                    <label name="display_baud"/>
+                    <field name="display_baud"/>
+                    <label name="display_digits"/>
+                    <field name="display_digits"/>
+                    <group name="grp_buttons" colspan="4" col="2">
+                        <button name="test_printer" string="Test printer" type="object"/>
+                        <button name="test_display" string="Test display" type="object"/>
+                    </group>
                 </form>
                 ]]>
             </field>
