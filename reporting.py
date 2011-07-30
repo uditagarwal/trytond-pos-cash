@@ -5,6 +5,7 @@ from decimal import Decimal
 import base64
 import cStringIO
 import datetime
+import serial
 
 from trytond.transaction import Transaction
 from trytond.report import Report
@@ -12,20 +13,6 @@ from trytond.pool import Pool
 
 _ROW_CHARACTERS = 42
 _DIGITS = 9
-
-class Printer(escpos.Escpos):
-
-    def __init__(self, port):
-        self._parallel_port = port
-
-    def open_device(self):
-        self._port = open(self._parallel_port, 'wb')
-
-    def close_device(self):
-        self._port.close()
-
-    def _raw(self, msg):
-        self._port.write(msg)
 
 class Receipt(Report):
     _name = 'pos_cash.receipt'
@@ -38,24 +25,41 @@ class Receipt(Report):
         config = Pool().get('pos_cash.configuration')
         config = config.browse(1)
         self._config = config
-        self._printer = Printer(config.printer_port)
-        self._logo = cStringIO.StringIO(base64.decodestring(self._config.logo))
+        self._port = escpos.FileDevice(config.printer_port)
+        self._logo = base64.decodestring(self._config.logo)
 
-    def test_printer(self):
+    def _open_device(self):
         if not self._config:
             self.load_config()
 
-        self._printer.open_device()
+        self._port.open_device()
+        self._printer = escpos.Printer(self._port)
+
+    def _close_device(self):
+        self._port.close_device()
+        del self._printer
+
+    def printing(f):
+        def p(self, *p, **kw):
+            try:
+                self._open_device()
+                res = f(self, *p, **kw)
+            finally:
+                self._close_device()
+            return res
+        return p
+
+    @printing
+    def test_printer(self):
         self.print_logo()
         self._printer.text('\n\n')
         self.print_impressum()
         self._printer.text('\n\n\n')
         self._printer.cut()
-        self._printer.close_device()
 
     def print_logo(self):
         self._printer.set(align='center')
-        self._printer.image(self._logo)
+        self._printer.image(cStringIO.StringIO(self._logo))
         self._printer.text('\n')
 
     def print_impressum(self):
@@ -68,8 +72,8 @@ class Receipt(Report):
         self._printer.set(align='center')
         self._printer.text(impressum + '\n')
 
+    @printing
     def print_sale(self, sale):
-        self.load_config()
         lang_obj = Pool().get('ir.lang')
         lang, = lang_obj.search([('code', '=', Transaction().language)])
         lang = lang_obj.browse(lang)
@@ -82,7 +86,7 @@ class Receipt(Report):
             printer.text(right + '\n')
 
         printer = self._printer
-        printer.open_device()
+
         self.print_logo()
         self.print_impressum()
         printer.set(align='left')
@@ -145,7 +149,74 @@ class Receipt(Report):
         printer.text('\n'*2)
         printer.text(self.format_lang(datetime.datetime.now(), lang, date=True))
         printer.cut()
-        printer.close_device()
 
 Receipt()
+
+
+class Display(Report):
+    _name = 'pos_cash.display'
+
+    def __init__(self):
+        super(Display, self).__init__()
+        self._display = False
+
+    def _get_lang(self):
+        lang_obj = Pool().get('ir.lang')
+        lang, = lang_obj.search([('code', '=', Transaction().language)])
+        return lang_obj.browse(lang)
+
+    def load_display(self):
+        config_obj = Pool().get('pos_cash.configuration')
+        config = config_obj.browse(1)
+        lang = self._get_lang()
+        self._display = escpos.Display(serial.Serial(
+                config.display_port, config.display_baud),
+                digits=int(config.display_digits), lang=lang.code)
+
+    def displaying(f):
+        def p(self, *p, **kw):
+            if not self._display:
+                self.load_display()
+            return f(self, *p, **kw)
+        return p
+
+    @displaying
+    def show_sale_line(self, sale_line):
+        lang = self._get_lang()
+        self._display.clear()
+        self._display.set_align('left')
+        self._display.text(sale_line.product.rec_name)
+        self._display.new_line()
+        self._display.text('%s x %s' % (
+                        self.format_lang(sale_line.quantity, lang, digits=0),
+                        self.format_lang(sale_line.unit_price, lang),
+                    )
+                )
+        self._display.set_align('right')
+        self._display.text(self.format_lang(sale_line.total, lang))
+
+    @displaying
+    def show_total(self, sale):
+        lang = self._get_lang()
+        self._display.clear()
+        self._display.text('Total:')
+        self._display.set_align('right')
+        self._display.text(self.format_lang(sale.total_amount, lang))
+
+    @displaying
+    def show_paid(self, sale):
+        lang = self._get_lang()
+        self._display.clear()
+        self._display.text('Paid:')
+        self._display.set_align('right')
+        f = lambda x: self.format_lang(x, lang)
+        self._display.text(f(sale.total_paid))
+        self._display.new_line()
+        self._display.set_align('left')
+        self._display.text('Drawback:')
+        self._display.set_align('right')
+        self._display.text(f(sale.drawback))
+
+
+Display()
 
