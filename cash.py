@@ -8,7 +8,7 @@ from escpos import escpos
 
 from trytond.model import ModelSQL, ModelView, ModelStorage, ModelSingleton, fields
 from trytond.wizard import Wizard
-from trytond.pyson import Eval, Equal, Not, Bool, Get
+from trytond.pyson import If, In, Eval, Get, Or, Not, Equal, Bool, And
 from trytond.pool import Pool
 
 class PosCashConfiguration(ModelSingleton, ModelSQL, ModelView):
@@ -50,7 +50,9 @@ class PosCashConfiguration(ModelSingleton, ModelSQL, ModelView):
         display = escpos.Display(port)
         display.set_cursor(False)
         display.clear()
-        display.text('Display works!!!\nWell...')
+        display.text('Display works!!!')
+        display.new_line()
+        display.text('Well!!!')
         del display
         port.close()
 
@@ -75,7 +77,19 @@ class PosCashSale(ModelSQL, ModelView):
 
     def __init__(self):
         super(PosCashSale, self).__init__()
-        self._display = False
+        self._disp = False
+        self._rpc.update({
+            'add_product': True,
+            'add_sum': True,
+            'set_quantity': True,
+            'cash_sale': True
+        })
+
+    @property
+    def _display(self):
+        if not self._disp:
+            self._disp = Pool().get('pos_cash.display', 'report')
+        return self._disp
 
     def default_receipt_code(self):
         config_obj = Pool().get('pos_cash.configuration')
@@ -99,7 +113,7 @@ class PosCashSale(ModelSQL, ModelView):
         for sale in self.browse(ids):
             taxes = []
             for line in sale.lines:
-                for tax in line.product.customer_taxes_used:
+                for tax in line.taxes:
                     if tax.id not in taxes:
                         taxes.append(tax.id)
             res[sale.id] = taxes
@@ -108,7 +122,7 @@ class PosCashSale(ModelSQL, ModelView):
     def get_total_tax(self, ids, name):
         res = {}
         for sale in self.browse(ids):
-            res[sale.id] = sale.total_amount-sale.total_without_tax
+            res[sale.id] = sale.total_amount - sale.total_without_tax
         return res
 
     def get_without_tax(self, ids, name):
@@ -121,25 +135,29 @@ class PosCashSale(ModelSQL, ModelView):
         return res
 
 
-    def add_product(self, sale, product, unit_price, qty):
-        sale_line_obj = Pool().get('pos_cash.sale.line')
-        line_id = sale_line_obj.create({'sale': sale.id,
+    def add_product(self, sale, product, qty, unit_price=None):
+        pool = Pool()
+        product_obj = pool.get('product.product')
+        product = product_obj.browse(product)
+        unit_price = unit_price or product.list_price
+        sale_line_obj = pool.get('pos_cash.sale.line')
+        line_id = sale_line_obj.create({'sale': sale,
                     'product': product.id,
                     'unit_price': unit_price,
                     'quantity': qty,
                 })
-        if not self._display:
-           self._display = Pool().get('pos_cash.display', 'report')
+
         line = sale_line_obj.browse(line_id)
         self._display.show_sale_line(line)
+        return line_id
 
-    def cash(self, sale, cash_amount):
+    def cash_sale(self, sale, cash_amount):
+        sale = self.browse(sale)
         self.write(sale.id, {'total_paid': cash_amount})
         pool = Pool()
+        self._display.show_paid(sale)
         config = pool.get('pos_cash.configuration').browse(1)
         receipt = pool.get('pos_cash.receipt', 'report')
-        display = Pool().get('pos_cash.display', 'report')
-        display.show_paid(sale)
         receipt.print_sale(sale)
 
     def get_drawback(self, ids, name):
@@ -151,23 +169,65 @@ class PosCashSale(ModelSQL, ModelView):
                 res[sale.id] = sale.total_paid - sale.total_amount
         return res
 
+    def add_sum(self, ids):
+        line_obj = Pool().get('pos_cash.sale.line')
+        if isinstance(ids, list):
+            ids = ids[0]
+        self._display.show_total(self.browse(ids))
+        return line_obj.create({'sale': ids, 'line_type': 'sum'})
+
+    def set_quantity(self, ids, quantity):
+        line_obj = Pool().get('pos_cash.sale.line')
+        res = line_obj.write(ids, {'quantity': int(quantity)})
+        if res:
+            self._display.show_sale_line(line_obj.browse(ids))
+        return res
+
 PosCashSale()
 
-
+STATES = {
+    'required': Equal(Eval('line_type'), 'position'),
+}
 class PosCashSaleLine(ModelSQL, ModelView):
     _name = 'pos_cash.sale.line'
 
     sale = fields.Many2One('pos_cash.sale', 'POS Sale', required=True)
-    product = fields.Many2One('product.product', 'Product', required=True)
-    unit_price = fields.Numeric('Unit price', digits=(16, 2), required=True)
+    line_type = fields.Selection([('position', 'Position'), ('sum', 'Sum'),
+            ('cancellation', 'Cancellation')], 'Line Type', required=True)
+    product = fields.Many2One('product.product', 'Product', states=STATES)
+    name = fields.Function(fields.Char('Name'), 'get_name')
+    unit_price = fields.Numeric('Unit price', digits=(16, 2), states=STATES)
     total = fields.Function(fields.Numeric('Total'), 'get_total')
-    quantity = fields.Numeric('Quantity', required=True)
+    quantity = fields.Numeric('Quantity', states=STATES)
     without_tax = fields.Function(fields.Numeric('Without Tax'),
             'get_without_tax')
+    taxes = fields.Function(fields.One2Many('account.tax', None, 'Taxes'),
+            'get_taxes')
+
+    def default_line_type(self):
+        return 'position'
+
+    def default_unit_price(self):
+        return Decimal(0)
+
+    def default_quantity(self):
+        return 0
+
+    def get_taxes(self, ids, name):
+        res = {}
+        for line in self.browse(ids):
+            res[line.id] = []
+            if line.line_type == 'sum':
+               continue
+            res[line.id] += [x.id for x in line.product.customer_taxes_used]
+        return res
 
     def get_without_tax(self, ids, name):
         res = {}
         for line in self.browse(ids):
+            if line.line_type == 'sum':
+                res[line.id] = Decimal('0')
+                continue
             taxes = Decimal(0)
             for tax in line.product.customer_taxes_used:
                 taxes += tax.percentage
@@ -175,10 +235,28 @@ class PosCashSaleLine(ModelSQL, ModelView):
             res[line.id] = line.total / ((taxes/100)+1)
         return res
 
+    def get_name(self, ids, name):
+        res = {}
+        for rec in self.browse(ids):
+            if rec.line_type == 'sum':
+                res[rec.id] = 'Sum:'
+            else:
+                res[rec.id] = rec.product.rec_name
+        return res
+
     def get_total(self, ids, name):
         res = {}
         for line in self.browse(ids):
-            res[line.id] = line.unit_price * line.quantity
+            if line.line_type == 'sum':
+                lines = self.search([('sale', '=', line.sale),
+                        ('create_date', '<', line.create_date),
+                        ('line_type', '!=', 'sum')])
+                s = Decimal('0')
+                for l in self.browse(lines):
+                    s += l.total
+                res[line.id] = s
+            else:
+                res[line.id] = line.unit_price * line.quantity
         return res
 
 PosCashSaleLine()

@@ -101,23 +101,25 @@ class Receipt(Report):
 
         printer.text('\n')
         for line in sale.lines:
-            tax_codes = []
-            for tax in line.product.customer_taxes_used:
-                tax_codes.append(taxes[tax.id]['code'])
-                taxes[tax.id]['amount'] += line.unit_price * line.quantity
-            tax_codes = ' '.join(tax_codes)
-            printer.text(line.product.rec_name[:_ROW_CHARACTERS] + '\n')
-            pos_text = '  %s x %s' % (
-                        self.format_lang(line.quantity, lang, digits=1),
-                        self.format_lang(line.unit_price, lang)
-                    )
-            total = self.format_lang(line.total, lang)
-            print_split(pos_text, total + ' ' + tax_codes)
+            if line.line_type == 'sum':
+                print_split('Total:', self.format_lang(line.total, lang) + '  ')
+                printer.text('\n')
+            else:
+                tax_codes = []
+                for tax in line.taxes:
+                    tax_codes.append(taxes[tax.id]['code'])
+                    taxes[tax.id]['amount'] += line.unit_price * line.quantity
+                tax_codes = ' '.join(tax_codes)
+
+                printer.text(line.name[:_ROW_CHARACTERS] + '\n')
+                pos_text = '  %s x %s' % (
+                            self.format_lang(line.quantity, lang, digits=1),
+                            self.format_lang(line.unit_price, lang)
+                        )
+                total = self.format_lang(line.total, lang)
+                print_split(pos_text, total + ' ' + tax_codes)
 
 
-        print_split('', '-' * _DIGITS + '  ')
-        print_split('Total:',
-                self.format_lang(sale.total_amount, lang) + '  ')
         print_split('Cash:',
                 self.format_lang(sale.total_paid, lang) + '  ')
         print_split('Drawback:',
@@ -171,7 +173,8 @@ class Display(Report):
         lang = self._get_lang()
         self._display = escpos.Display(serial.Serial(
                 config.display_port, config.display_baud),
-                digits=int(config.display_digits), lang=lang.code)
+                digits=int(config.display_digits))
+        self._display.set_cursor(False)
 
     def displaying(f):
         def p(self, *p, **kw):
@@ -185,7 +188,7 @@ class Display(Report):
         lang = self._get_lang()
         self._display.clear()
         self._display.set_align('left')
-        self._display.text(sale_line.product.rec_name)
+        self._display.text(sale_line.product.name)
         self._display.new_line()
         self._display.text('%s x %s' % (
                         self.format_lang(sale_line.quantity, lang, digits=0),
