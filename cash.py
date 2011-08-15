@@ -2,7 +2,6 @@
 #this repository contains the full copyright notices and license terms.
 from __future__ import with_statement
 from decimal import Decimal
-from receipt import Receipt
 import serial
 from escpos import escpos
 
