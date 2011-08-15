@@ -12,6 +12,7 @@
         'res',
         'product',
         'account',
+        'account_product',
     ],
     'xml' : [
         'cash.xml',

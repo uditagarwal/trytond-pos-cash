@@ -157,7 +157,9 @@ class PosCashSale(ModelSQL, ModelView):
         self._display.show_paid(sale)
         config = pool.get('pos_cash.configuration').browse(1)
         receipt = pool.get('pos_cash.receipt', 'report')
+        receipt.kick_cash_drawer()
         receipt.print_sale(sale)
+
 
     def get_drawback(self, ids, name):
         res = {}
@@ -190,7 +192,8 @@ STATES = {
 class PosCashSaleLine(ModelSQL, ModelView):
     _name = 'pos_cash.sale.line'
 
-    sale = fields.Many2One('pos_cash.sale', 'POS Sale', required=True)
+    sale = fields.Many2One('pos_cash.sale', 'POS Sale', required=True,
+            ondelete='CASCADE')
     line_type = fields.Selection([('position', 'Position'), ('sum', 'Sum'),
             ('cancellation', 'Cancellation')], 'Line Type', required=True)
     product = fields.Many2One('product.product', 'Product', states=STATES)
@@ -240,7 +243,7 @@ class PosCashSaleLine(ModelSQL, ModelView):
             if rec.line_type == 'sum':
                 res[rec.id] = 'Sum:'
             else:
-                res[rec.id] = rec.product.rec_name
+                res[rec.id] = rec.product.name
         return res
 
     def get_total(self, ids, name):

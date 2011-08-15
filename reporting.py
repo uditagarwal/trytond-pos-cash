@@ -41,8 +41,8 @@ class Receipt(Report):
 
     def printing(f):
         def p(self, *p, **kw):
+            self._open_device()
             try:
-                self._open_device()
                 res = f(self, *p, **kw)
             finally:
                 self._close_device()
@@ -71,6 +71,10 @@ class Receipt(Report):
             address.zip + ' ' + address.city])
         self._printer.set(align='center')
         self._printer.text(impressum + '\n')
+
+    @printing
+    def kick_cash_drawer(self):
+        self._printer.cashdraw(2)
 
     @printing
     def print_sale(self, sale):
