@@ -3,6 +3,20 @@
 this repository contains the full copyright notices and license terms. -->
 <tryton>
     <data>
+        <record model="ir.sequence.type" id="sequence_type_pos_cash">
+          <field name="name">POS Cash Sequence Type</field>
+          <field name="code">pos_cash</field>
+        </record>
+        <record model="ir.sequence.type-res.group"
+            id="sequence_type_pos_cash_group_admin">
+            <field name="sequence_type" ref="sequence_type_pos_cash"/>
+            <field name="group" ref="res.group_admin"/>
+        </record>
+
+        <record model="ir.sequence.strict" id="sequence_ticket">
+          <field name="name">POS Cash Sequence</field>
+          <field name="code">pos_cash</field>
+        </record>
         <record model="ir.ui.view" id="configuration_view_form">
             <field name="model">pos_cash.configuration</field>
             <field name="type">form</field>
