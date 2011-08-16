@@ -44,16 +44,22 @@ class PosCashConfiguration(ModelSingleton, ModelSQL, ModelView):
         receipt.test_printer()
 
     def test_display(self, ids):
-        config = self.browse(1)
-        port = serial.Serial(config.display_port, config.display_baud)
-        display = escpos.Display(port)
-        display.set_cursor(False)
-        display.clear()
-        display.text('Display works!!!')
-        display.new_line()
-        display.text('Well!!!')
-        del display
-        port.close()
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+
+        if configuration.display_port:
+            port = serial.Serial(
+                configuration.display_port, configuration.display_baud)
+            display = escpos.Display(port)
+            display.set_cursor(False)
+            display.clear()
+            display.text('Display works!!!')
+            display.new_line()
+            display.text('Well!!!')
+            del display
+            port.close()
 
 PosCashConfiguration()
 
@@ -137,9 +143,11 @@ class PosCashSale(ModelSQL, ModelView):
     def add_product(self, sale, product, qty, unit_price=None):
         pool = Pool()
         product_obj = pool.get('product.product')
+        configuration_obj = pool.get('pos_cash.configuration')
+        sale_line_obj = pool.get('pos_cash.sale.line')
+
         product = product_obj.browse(product)
         unit_price = unit_price or product.list_price
-        sale_line_obj = pool.get('pos_cash.sale.line')
         line_id = sale_line_obj.create({'sale': sale,
                     'product': product.id,
                     'unit_price': unit_price,
@@ -147,18 +155,36 @@ class PosCashSale(ModelSQL, ModelView):
                 })
 
         line = sale_line_obj.browse(line_id)
-        self._display.show_sale_line(line)
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+        if configuration.display_port:
+            self._display.show_sale_line(line)
         return line_id
 
-    def cash_sale(self, sale, cash_amount):
-        sale = self.browse(sale)
-        self.write(sale.id, {'total_paid': cash_amount})
+    def cash_sale(self, sale_id, cash_amount):
         pool = Pool()
-        self._display.show_paid(sale)
-        config = pool.get('pos_cash.configuration').browse(1)
         receipt = pool.get('pos_cash.receipt', 'report')
-        receipt.kick_cash_drawer()
-        receipt.print_sale(sale)
+        configuration_obj = pool.get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+        sale = self.browse(sale_id)
+        drawback = self.get_drawback([sale_id], '')
+        print "drawback", drawback
+
+        total_paid = sale.total_paid
+        if total_paid <= cash_amount:
+            self.write(sale.id, {'total_paid': cash_amount})
+
+
+        if configuration.display_port:
+            self._display.show_paid(sale)
+        if configuration.logo:
+            receipt.kick_cash_drawer()
+        if configuration.printer_port:
+            receipt.print_sale(sale)
+
+        return drawback
 
 
     def get_drawback(self, ids, name):
@@ -172,9 +198,14 @@ class PosCashSale(ModelSQL, ModelView):
 
     def add_sum(self, ids):
         line_obj = Pool().get('pos_cash.sale.line')
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
         if isinstance(ids, list):
             ids = ids[0]
-        self._display.show_total(self.browse(ids))
+        if configuration.display_port:
+            self._display.show_total(self.browse(ids))
         return line_obj.create({'sale': ids, 'line_type': 'sum'})
 
     def set_quantity(self, ids, quantity):

@@ -22,22 +22,34 @@ class Receipt(Report):
         self._config = False
 
     def load_config(self):
-        config = Pool().get('pos_cash.configuration')
-        config = config.browse(1)
-        self._config = config
-        self._port = escpos.FileDevice(config.printer_port)
-        self._logo = base64.decodestring(self._config.logo)
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        self._port = None
+        self._logo = None
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+
+        self._config = configuration
+        if configuration.printer_port:
+            self._port = escpos.FileDevice(config.printer_port)
+        if self._config.logo:
+            self._logo = base64.decodestring(self._config.logo)
 
     def _open_device(self):
+        self._printer = None
+
         if not self._config:
             self.load_config()
 
-        self._port.open_device()
-        self._printer = escpos.Printer(self._port)
+        if self._port:
+            self._port.open_device()
+            self._printer = escpos.Printer(self._port)
 
     def _close_device(self):
-        self._port.close_device()
-        del self._printer
+        if self._port:
+            self._port.close_device()
+        if self._printer:
+            del self._printer
 
     def printing(f):
         def p(self, *p, **kw):
@@ -51,11 +63,16 @@ class Receipt(Report):
 
     @printing
     def test_printer(self):
-        self.print_logo()
-        self._printer.text('\n\n')
-        self.print_impressum()
-        self._printer.text('\n\n\n')
-        self._printer.cut()
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+        if configuration.printer_port:
+            self.print_logo()
+            self._printer.text('\n\n')
+            self.print_impressum()
+            self._printer.text('\n\n\n')
+            self._printer.cut()
 
     def print_logo(self):
         self._printer.set(align='center')
@@ -172,13 +189,17 @@ class Display(Report):
         return lang_obj.browse(lang)
 
     def load_display(self):
-        config_obj = Pool().get('pos_cash.configuration')
-        config = config_obj.browse(1)
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+
         lang = self._get_lang()
-        self._display = escpos.Display(serial.Serial(
+        if configuration.display_port:
+            self._display = escpos.Display(serial.Serial(
                 config.display_port, config.display_baud),
                 digits=int(config.display_digits))
-        self._display.set_cursor(False)
+            self._display.set_cursor(False)
 
     def displaying(f):
         def p(self, *p, **kw):
@@ -189,40 +210,58 @@ class Display(Report):
 
     @displaying
     def show_sale_line(self, sale_line):
-        lang = self._get_lang()
-        self._display.clear()
-        self._display.set_align('left')
-        self._display.text(sale_line.product.name)
-        self._display.new_line()
-        self._display.text('%s x %s' % (
-                        self.format_lang(sale_line.quantity, lang, digits=0),
-                        self.format_lang(sale_line.unit_price, lang),
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+
+        if configuration.display_port:
+            lang = self._get_lang()
+            self._display.clear()
+            self._display.set_align('left')
+            self._display.text(sale_line.product.name)
+            self._display.new_line()
+            self._display.text('%s x %s' % (
+                            self.format_lang(sale_line.quantity, lang, digits=0),
+                            self.format_lang(sale_line.unit_price, lang),
+                        )
                     )
-                )
-        self._display.set_align('right')
-        self._display.text(self.format_lang(sale_line.total, lang))
+            self._display.set_align('right')
+            self._display.text(self.format_lang(sale_line.total, lang))
 
     @displaying
     def show_total(self, sale):
-        lang = self._get_lang()
-        self._display.clear()
-        self._display.text('Total:')
-        self._display.set_align('right')
-        self._display.text(self.format_lang(sale.total_amount, lang))
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+
+        if configuration.display_port:
+            lang = self._get_lang()
+            self._display.clear()
+            self._display.text('Total:')
+            self._display.set_align('right')
+            self._display.text(self.format_lang(sale.total_amount, lang))
 
     @displaying
     def show_paid(self, sale):
-        lang = self._get_lang()
-        self._display.clear()
-        self._display.text('Paid:')
-        self._display.set_align('right')
-        f = lambda x: self.format_lang(x, lang)
-        self._display.text(f(sale.total_paid))
-        self._display.new_line()
-        self._display.set_align('left')
-        self._display.text('Drawback:')
-        self._display.set_align('right')
-        self._display.text(f(sale.drawback))
+        configuration_obj = Pool().get('pos_cash.configuration')
+
+        configuration_id = configuration_obj.search([])[0]
+        configuration = configuration_obj.browse(configuration_id)
+
+        if configuration.display_port:
+            lang = self._get_lang()
+            self._display.clear()
+            self._display.text('Paid:')
+            self._display.set_align('right')
+            f = lambda x: self.format_lang(x, lang)
+            self._display.text(f(sale.total_paid))
+            self._display.new_line()
+            self._display.set_align('left')
+            self._display.text('Drawback:')
+            self._display.set_align('right')
+            self._display.text(f(sale.drawback))
 
 
 Display()
