@@ -31,7 +31,7 @@ class Receipt(Report):
 
         self._config = configuration
         if configuration.printer_port:
-            self._port = escpos.FileDevice(config.printer_port)
+            self._port = escpos.FileDevice(self._config.printer_port)
         if self._config.logo:
             self._logo = base64.decodestring(self._config.logo)
 
@@ -197,8 +197,8 @@ class Display(Report):
         lang = self._get_lang()
         if configuration.display_port:
             self._display = escpos.Display(serial.Serial(
-                config.display_port, config.display_baud),
-                digits=int(config.display_digits))
+                configuration.display_port, configuration.display_baud),
+                digits=int(configuration.display_digits))
             self._display.set_cursor(False)
 
     def displaying(f):

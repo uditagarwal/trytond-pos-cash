@@ -170,7 +170,6 @@ class PosCashSale(ModelSQL, ModelView):
         configuration = configuration_obj.browse(configuration_id)
         sale = self.browse(sale_id)
         drawback = self.get_drawback([sale_id], '')
-        print "drawback", drawback
 
         total_paid = sale.total_paid
         if total_paid <= cash_amount:
