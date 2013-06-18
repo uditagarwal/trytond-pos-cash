@@ -1,0 +1,159 @@
+<?xml version="1.0"?>
+<!-- This file is part of Tryton.  The COPYRIGHT file at the top level of
+this repository contains the full copyright notices and license terms. -->
+<tryton>
+    <data>
+        <record model="ir.sequence.type" id="sequence_type_pos_cash">
+          <field name="name">POS Cash Sequence Type</field>
+          <field name="code">pos_cash</field>
+        </record>
+        <record model="ir.sequence.type-res.group"
+            id="sequence_type_pos_cash_group_admin">
+            <field name="sequence_type" ref="sequence_type_pos_cash"/>
+            <field name="group" ref="res.group_admin"/>
+        </record>
+
+        <record model="ir.sequence.strict" id="sequence_ticket">
+          <field name="name">POS Cash Sequence</field>
+          <field name="code">pos_cash</field>
+        </record>
+        <record model="ir.ui.view" id="configuration_view_form">
+            <field name="model">pos_cash.configuration</field>
+            <field name="type">form</field>
+            <field name="priority">10</field>
+            <field name="arch" type="xml">
+                <![CDATA[
+                <form string="POS-Cash configuration" col="4">
+                    <label name="printer_port"/>
+                    <field name="printer_port"/>
+                    <label name="company"/>
+                    <field name="company"/>
+                    <label name="logo"/>
+                    <field name="logo"/>
+                    <label name="sequence"/>
+                    <field name="sequence"/>
+                    <label name="display_port"/>
+                    <field name="display_port"/>
+                    <label name="display_baud"/>
+                    <field name="display_baud"/>
+                    <label name="display_digits"/>
+                    <field name="display_digits"/>
+                    <group name="grp_buttons" colspan="4" col="2">
+                        <button name="test_printer" string="Test printer" type="object"/>
+                        <button name="test_display" string="Test display" type="object"/>
+                    </group>
+                </form>
+                ]]>
+            </field>
+        </record>
+
+        <record model="ir.action.act_window" id="act_configuration_form">
+            <field name="name">POS-Cash Configuration</field>
+            <field name="res_model">pos_cash.configuration</field>
+        </record>
+
+        <record model="ir.action.act_window.view" id="act_configuration_view_form">
+            <field name="sequence" eval="10"/>
+            <field name="view" ref="configuration_view_form"/>
+            <field name="act_window" ref="act_configuration_form"/>
+        </record>
+
+        <menuitem name="POS Cash" id="menu_main" sequence="1"
+            icon="tryton-system"/>
+
+        <menuitem name="Configuration" parent="menu_main" id="menu_configuration" sequence="1"
+            icon="tryton-preferences-system" action="act_configuration_form"/>
+
+        <record model="ir.action.wizard" id="wizard_add_product">
+            <field name="name">Add Product</field>
+            <field name="wiz_name">pos_cash.sale.add_product</field>
+        </record>
+
+        <record model="ir.action.wizard" id="wizard_cash_sale">
+            <field name="name">Cash</field>
+            <field name="wiz_name">pos_cash.sale.cash</field>
+        </record>
+
+        <record model="ir.ui.view" id="pos_sale_view_form">
+            <field name="model">pos_cash.sale</field>
+            <field name="type">form</field>
+            <field name="priority">10</field>
+            <field name="arch" type="xml">
+                <![CDATA[
+                <form string="POS-Cash configuration" col="4">
+                    <field name="lines" colspan="2">
+                        <tree string="Positions">
+                            <field name="name"/>
+                            <field name="quantity"/>
+                            <field name="unit_price"/>
+                            <field name="total"/>
+                        </tree>
+                    </field>
+                    <group name="summary" colspan="2" col="2">
+                        <group name="add_buttons" colspan="2">
+                            <button name="%(wizard_add_product)d" string="_Add Product"
+                                type="action"
+                                icon="tryton-go-next"/>
+                        </group>
+                        <label name="receipt_code"/>
+                        <field name="receipt_code"/>
+                        <label name="total_without_tax"/>
+                        <field name="total_without_tax"/>
+                        <label name="total_tax"/>
+                        <field name="total_tax"/>
+                        <label name="total_amount"/>
+                        <field name="total_amount"/>
+                        <group name="cash" colspan="2">
+                            <button name="%(wizard_cash_sale)d" string="_Cash Sale"
+                                    type="action"
+                                    icon="tryton-go-next"/>
+                            <button name="add_sum" string="Add sum" type="object"/>
+                        </group>
+                        <label name="total_paid"/>
+                        <field name="total_paid"/>
+                        <label name="drawback"/>
+                        <field name="drawback"/>
+                    </group>
+                    <field name="taxes" colspan="2"/>
+                </form>
+                ]]>
+            </field>
+        </record>
+
+        <record model="ir.ui.view" id="pos_sale_view_tree">
+            <field name="model">pos_cash.sale</field>
+            <field name="type">tree</field>
+            <field name="priority">10</field>
+            <field name="arch" type="xml">
+                <![CDATA[
+                <tree string="Synchronize Models">
+                    <field name="create_date" select="1"/>
+                    <field name="lines"/>
+                    <field name="total_amount"/>
+                </tree>
+                ]]>
+            </field>
+        </record>
+
+        <record model="ir.action.act_window" id="act_pos_sale_form">
+            <field name="name">POS-Cash Sale</field>
+            <field name="res_model">pos_cash.sale</field>
+        </record>
+
+        <record model="ir.action.act_window.view" id="act_pos_sale_view_form">
+            <field name="sequence" eval="10"/>
+            <field name="view" ref="pos_sale_view_form"/>
+            <field name="act_window" ref="act_pos_sale_form"/>
+        </record>
+
+        <record model="ir.action.act_window.view" id="act_pos_sale_view_tree">
+            <field name="sequence" eval="20"/>
+            <field name="view" ref="pos_sale_view_tree"/>
+            <field name="act_window" ref="act_pos_sale_form"/>
+        </record>
+
+        <menuitem name="Sale" parent="menu_main" id="menu_sale" sequence="1"
+            icon="tryton-print" action="act_pos_sale_form"/>
+
+    </data>
+</tryton>
