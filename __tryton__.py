@@ -2,7 +2,7 @@
 #this repository contains the full copyright notices and license terms.
 {
     'name' : 'POS Cash',
-    'version' : '0.1.0',
+    'version' : '2.4.1.0',
     'author' : 'Max Holtzberg',
     'email': 'max@holtzberg.de',
     'website': 'http://www.tryton.org/',
