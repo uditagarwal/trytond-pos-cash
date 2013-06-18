@@ -1,31 +1,43 @@
 #This file is part of Tryton.  The COPYRIGHT file at the top level of
 #this repository contains the full copyright notices and license terms.
-from trytond.model import ModelSQL, ModelView, fields
+from trytond.model import ModelSQL, ModelView
 from trytond.pool import Pool
 
-class Template(ModelSQL, ModelView):
-    _name = 'product.template'
 
-    def get_account(self, ids, name):
-        account_obj = Pool().get('account.account')
+__all__ = ['Template']
+
+
+class Template(ModelSQL, ModelView):
+    """
+        Template for the product to appear in lines in the POS System
+    """
+    __name__ = 'product.template'
+
+    @classmethod
+    def get_account(cls, products, name):
+        """
+        Gets the account of the current purchaser
+        """
+        Account = Pool().get('account.account')
+
         res = {}
         name = name[:-5]
-        for product in self.browse(ids):
+        for product in products:
             if product[name]:
                 res[product.id] = product[name].id
             else:
-                if product.category[name]:
-                    res[product.id] = product.category[name].id
-                else:
-                    res[product.id] = False
-                    # self.raise_user_error('missing_account',
-                    #         (product.name, product.id))
+                res[product.id] = product.category[name] and \
+                        product.category[name].id or None
         return res
 
-    def get_taxes(self, ids, name):
+    @classmethod
+    def get_taxes(cls, products, name):
+        """
+        Gets the taxes for the products
+        """
         res = {}
         name = name[:-5]
-        for product in self.browse(ids):
+        for product in products:
             if product.taxes_category:
                 res[product.id] = []
                 c = product.category
@@ -35,5 +47,3 @@ class Template(ModelSQL, ModelView):
             else:
                 res[product.id] = [x.id for x in product[name]]
         return res
-
-Template()

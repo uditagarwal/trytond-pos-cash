@@ -14,20 +14,30 @@ from trytond.pool import Pool
 _ROW_CHARACTERS = 42
 _DIGITS = 9
 
-class Receipt(Report):
-    _name = 'pos_cash.receipt'
 
-    def __init__(self):
-        super(Receipt, self).__init__()
-        self._config = False
+__all__ = ['Receipt', 'Display']
+
+
+class Receipt(Report):
+    """
+    Class to create Reciepts for the Sale Processed
+    """
+    __name__ = 'pos_cash.receipt'
+
+    @classmethod
+    def __setup__(cls):
+        super(Receipt, cls).__setup__()
+        cls._config = False
 
     def load_config(self):
-        configuration_obj = Pool().get('pos_cash.configuration')
+        """
+        Loads printer port from Configuration
+        """
+        Configuration = Pool().get('pos_cash.configuration')
 
         self._port = None
         self._logo = None
-        configuration_id = configuration_obj.search([])[0]
-        configuration = configuration_obj.browse(configuration_id)
+        configuration = Configuration.search([])[0]
 
         self._config = configuration
         if configuration.printer_port:
@@ -63,10 +73,12 @@ class Receipt(Report):
 
     @printing
     def test_printer(self):
-        configuration_obj = Pool().get('pos_cash.configuration')
+        """
+        Function to test if printer is working
+        """
+        Configuration = Pool().get('pos_cash.configuration')
 
-        configuration_id = configuration_obj.search([])[0]
-        configuration = configuration_obj.browse(configuration_id)
+        configuration = Configuration.search([])[0]
         if configuration.printer_port:
             self.print_logo()
             self._printer.text('\n\n')
@@ -95,9 +107,12 @@ class Receipt(Report):
 
     @printing
     def print_sale(self, sale):
-        lang_obj = Pool().get('ir.lang')
-        lang, = lang_obj.search([('code', '=', Transaction().language)])
-        lang = lang_obj.browse(lang)
+        """
+        Function to print the reciept for the sale
+        """
+        Lang = Pool().get('ir.lang')
+
+        lang = Lang.search([('code', '=', Transaction().language)])
 
         def print_split(left, right):
             len_left = _ROW_CHARACTERS - len(right) - 1
@@ -173,26 +188,31 @@ class Receipt(Report):
         printer.text(self.format_lang(datetime.datetime.now(), lang, date=True))
         printer.cut()
 
-Receipt()
-
-
 class Display(Report):
-    _name = 'pos_cash.display'
+    """
+    Function to display report of the sale
+    """
+    __name__ = 'pos_cash.display'
 
-    def __init__(self):
-        super(Display, self).__init__()
-        self._display = False
+    def __setup__(cls):
+        super(Display, cls).__setup__()
+        cls._display = False
 
     def _get_lang(self):
-        lang_obj = Pool().get('ir.lang')
-        lang, = lang_obj.search([('code', '=', Transaction().language)])
-        return lang_obj.browse(lang)
+        """
+        Gets the language set in the Tryton System
+        """
+        Lang = Pool().get('ir.lang')
+
+        return Lang.search([('code', '=', Transaction().language)])[0]
 
     def load_display(self):
-        configuration_obj = Pool().get('pos_cash.configuration')
+        """
+        Loads display
+        """
+        Configuration = Pool().get('pos_cash.configuration')
 
-        configuration_id = configuration_obj.search([])[0]
-        configuration = configuration_obj.browse(configuration_id)
+        configuration = Configuration.search([])[0]
 
         lang = self._get_lang()
         if configuration.display_port:
@@ -210,10 +230,12 @@ class Display(Report):
 
     @displaying
     def show_sale_line(self, sale_line):
-        configuration_obj = Pool().get('pos_cash.configuration')
+        """
+        Shows the lines of the sale
+        """
+        Configuration = Pool().get('pos_cash.configuration')
 
-        configuration_id = configuration_obj.search([])[0]
-        configuration = configuration_obj.browse(configuration_id)
+        configuration = Configuration.search([])[0]
 
         if configuration.display_port:
             lang = self._get_lang()
@@ -231,10 +253,12 @@ class Display(Report):
 
     @displaying
     def show_total(self, sale):
-        configuration_obj = Pool().get('pos_cash.configuration')
+        """
+        Shows total of sale line
+        """
+        Configuration = Pool().get('pos_cash.configuration')
 
-        configuration_id = configuration_obj.search([])[0]
-        configuration = configuration_obj.browse(configuration_id)
+        configuration = Configuration.search([])[0]
 
         if configuration.display_port:
             lang = self._get_lang()
@@ -245,10 +269,12 @@ class Display(Report):
 
     @displaying
     def show_paid(self, sale):
-        configuration_obj = Pool().get('pos_cash.configuration')
+        """
+        Show amount paid by the customer
+        """
+        Configuration = Pool().get('pos_cash.configuration')
 
-        configuration_id = configuration_obj.search([])[0]
-        configuration = configuration_obj.browse(configuration_id)
+        configuration = Configuration.search([])[0]
 
         if configuration.display_port:
             lang = self._get_lang()
@@ -262,7 +288,3 @@ class Display(Report):
             self._display.text('Drawback:')
             self._display.set_align('right')
             self._display.text(f(sale.drawback))
-
-
-Display()
-

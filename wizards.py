@@ -1,36 +1,46 @@
 #This file is part of Tryton.  The COPYRIGHT file at the top level of
 #this repository contains the full copyright notices and license terms.
-from trytond.model import ModelSQL, ModelView, fields
+from trytond.model import ModelView, fields
 from trytond.wizard import Wizard
 from trytond.transaction import Transaction
 from trytond.pool import Pool
 
+
+__all__ = [
+    'AddProductSelect', 'WizardAddProduct', 'CashAmountEnter', \
+    'WizardCashSale'
+]
+
 class AddProductSelect(ModelView):
-    _name = 'pos_cash.sale.add_product.select'
-    _description = 'Select Product'
+    'Add Product Select'
+    __name__ = 'pos_cash.sale.add_product.select'
 
     product = fields.Many2One('product.product', 'Product',
             on_change=['product'])
     unit_price = fields.Numeric('Unit price', digits=(16, 2))
     quantity = fields.Numeric('Quantity')
 
-    def default_quantity(self):
+    @staticmethod
+    def default_quantity():
+        """
+        Sets default for quantity
+        """
         return 1
 
-    def on_change_product(self, vals):
-        if not vals.get('product'):
+    def on_change_product(self):
+        """
+        Changes the value of product
+
+        :return: updated value of unit_price
+        """
+        if not self.product:
             return {}
-        product_obj = Pool().get('product.product')
-        product = product_obj.browse(vals['product'])
-        return {'unit_price': product.list_price}
-
-
-
-AddProductSelect()
+        return {'unit_price': self.product.list_price}
 
 
 class WizardAddProduct(Wizard):
-    _name = 'pos_cash.sale.add_product'
+    'Wizard Add Product'
+    __name__ = 'pos_cash.sale.add_product'
 
     states = {
         'init': {
@@ -53,26 +63,27 @@ class WizardAddProduct(Wizard):
     }
 
     def _action_add(self, data):
-        active_id = Transaction().context.get('active_id', False)
-        sale_obj = Pool().get('pos_cash.sale')
-        form = data['form']
-        sale_obj.add_product(active_id, form['product'], form['quantity'],
-                form['unit_price'])
+        """
+        Action to add product
+        """
+        PosCashSale = Pool().get('pos_cash.sale')
 
-WizardAddProduct()
+        active_id = Transaction().context.get('active_id', False)
+        form = data['form']
+        PosCashSale.add_product(active_id, form['product'], form['quantity'],
+                form['unit_price'])
 
 
 class CashAmountEnter(ModelView):
-    _name = 'pos_cash.sale.cash_amount_enter'
-    _description = 'Select Product'
+    'Cash Amount Enter'
+    __name__ = 'pos_cash.sale.cash_amount_enter'
 
     cash_amount = fields.Numeric('Cash amount', required=True)
 
-CashAmountEnter()
-
 
 class WizardCashSale(Wizard):
-    _name = 'pos_cash.sale.cash'
+    'Wizard Cash Sale'
+    __name__ = 'pos_cash.sale.cash'
 
     states = {
 
@@ -97,9 +108,10 @@ class WizardCashSale(Wizard):
 
 
     def _action_cash_received(self, data):
+        """
+        Action to receive cash
+        """
+        PosCashSale = Pool().get('pos_cash.sale')
+        
         active_id = Transaction().context.get('active_id', False)
-        sale_obj = Pool().get('pos_cash.sale')
-        sale_obj.cash_sale(active_id, data['form']['cash_amount'])
-
-WizardCashSale()
-
+        PosCashSale.cash_sale(active_id, data['form']['cash_amount'])
